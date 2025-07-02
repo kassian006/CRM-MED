@@ -9,7 +9,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
 from django.db.models import Sum, Q
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from drf_yasg.utils import swagger_auto_schema
 from .models import Report
+from rest_framework.parsers import MultiPartParser, FormParser
 from .serializers import ReportSerializer
 from .models import EmailLoginCode
 from rest_framework.decorators import api_view
@@ -37,6 +39,8 @@ from django.db.models import Sum
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
+
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth, TruncYear
 from datetime import timedelta, datetime
@@ -180,6 +184,12 @@ class DoctorDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 class DoctorCreateAPIView(generics.CreateAPIView):
     serializer_class = DoctorCreateSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    @swagger_auto_schema(request_body=DoctorCreateSerializer)
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
 
     # def create(self, request, *args, **kwargs):
     #     try:

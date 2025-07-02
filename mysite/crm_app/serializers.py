@@ -112,38 +112,26 @@ class DoctorDetailSerializer(serializers.ModelSerializer):
 
 
 class DoctorCreateSerializer(serializers.ModelSerializer):
-    department_name = DepartmentSerializer(source='department', write_only=True)
-    speciality = SpecialitySerializer()
+    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all())
+    speciality = serializers.PrimaryKeyRelatedField(queryset=Speciality.objects.all())
 
     class Meta:
         model = Doctor
-        fields = ['first_name', 'last_name', 'image', 'department_name', 'speciality', 'phone_number', 'email', 'bonus', 'cabinet']
+        fields = ['first_name', 'last_name', 'image', 'department', 'speciality', 'phone_number', 'email', 'bonus', 'cabinet']
 
     def create(self, validated_data):
         # Extract nested data
-        department_data = validated_data.pop('department', None)
-        speciality_data = validated_data.pop('speciality', None)
+        department = validated_data.pop('department', None)  # Already a Department instance or None
+        speciality = validated_data.pop('speciality', None)  # Already a Speciality instance
 
-        # Create or get Department instance
-        if department_data:
-            department, _ = Department.objects.get_or_create(
-                department_name=department_data['department_name']
-            )
-        else:
-            department = None
-
-        # Create or get Speciality instance
-        if speciality_data:
-            speciality, _ = Speciality.objects.get_or_create(
-                speciality_title=speciality_data['speciality_title']
-            )
-        else:
+        # Validate speciality (since it's required)
+        if not speciality:
             raise serializers.ValidationError({"speciality": "This field is required."})
 
         # Create Doctor instance
         doctor = Doctor.objects.create(
-            department=department,
-            speciality=speciality,
+            department=department,  # Use the Department instance directly
+            speciality=speciality,  # Use the Speciality instance directly
             **validated_data
         )
         return doctor
