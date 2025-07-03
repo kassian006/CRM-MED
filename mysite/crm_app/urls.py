@@ -10,9 +10,11 @@ router = SimpleRouter()
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('send-code/', send_login_code_view, name='send-login-code'),
-    path('verify-code/', verify_login_code, name='verify-login-code'),
-    path('reset-password/', reset_password_view, name='reset-password'),
+    path('password_reset/verify_code/', verify_reset_code, name='verify_reset_code'),
+    path('password_reset/', include('django_rest_passwordreset.urls', namespace='password_reset')),
+    # path('send-code/', send_login_code_view, name='send-login-code'),
+    # path('verify-code/', verify_login_code, name='verify-login-code'),
+    # path('reset-password/', reset_password_view, name='reset-password'),
     path('login/', CustomLoginView.as_view(), name='login'),
     path('login/admin/', CustomAdminLoginView.as_view(), name='admin-login'),
     path('logout/', LogoutView.as_view(), name='logout'),

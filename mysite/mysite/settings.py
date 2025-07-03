@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "phonenumber_field",
     'django_filters',
     'rest_framework_simplejwt',
+    'django_rest_passwordreset',
     'django_seed',
     'drf_yasg',
     'rest_framework_swagger',
