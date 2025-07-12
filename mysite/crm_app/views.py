@@ -488,70 +488,93 @@ class SummaryReportExportExcelView(APIView):
         return response
 
 
+from collections import defaultdict
+from datetime import timedelta
+import calendar
+from django.utils import timezone
+from django.utils.translation import activate
+from django.contrib.humanize.templatetags.humanize import intcomma
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
 class AppointmentStatisticsAPIView(APIView):
     def get(self, request):
+        activate('ru')  # Врубаем русский язык для локализации
+
         period = request.query_params.get('period', 'weekly')
         today = timezone.now().date()
 
+        # Определяем стартовую дату по периоду
         if period == 'daily':
             start_date = today
-            delta = timedelta(days=1)
         elif period == 'weekly':
             start_date = today - timedelta(days=6)
-            delta = timedelta(days=1)
         elif period == 'monthly':
             start_date = today - timedelta(days=29)
-            delta = timedelta(days=1)
         elif period == 'yearly':
             start_date = today - timedelta(days=364)
-            delta = timedelta(days=30)
         else:
             return Response({"error": "Invalid period"}, status=400)
 
+        # Выносим словарь с месяцами на уровень метода
+        month_map = {
+            1: "Янв", 2: "Фев", 3: "Мар", 4: "Апр", 5: "Май", 6: "Июн",
+            7: "Июл", 8: "Авг", 9: "Сен", 10: "Окт", 11: "Ноя", 12: "Дек"
+        }
+
         chart_data = defaultdict(lambda: {"total": 0, "canceled": 0})
 
-        patients = Patient.objects.filter(appointment_date__range=(start_date, today))
+        # Берём пациентов с записью на приём в нужном периоде
+        patients = Patient.objects.filter(
+            appointment_date__range=(start_date, today)
+        )
 
+        # Считаем статистику по каждому дню
         for patient in patients:
-            date_str = patient.appointment_date.strftime("%d %b")
-            chart_data[date_str]["total"] += 1
+            month_short = month_map[patient.appointment_date.month]
+            date_key = f"{month_short} {patient.appointment_date.day:02d}"
+
+            chart_data[date_key]["total"] += 1
             if patient.status_patient == "Отмененные":
-                chart_data[date_str]["canceled"] += 1
+                chart_data[date_key]["canceled"] += 1
 
-        sorted_chart = [
-            {"period": key, "total": value["total"], "canceled": value["canceled"]}
-            for key, value in sorted(chart_data.items(), key=lambda x: datetime.strptime(x[0], "%d %b"))
-        ]
+        # Формируем отсортированный список для графика
+        sorted_chart = []
+        for day_offset in range((today - start_date).days + 1):
+            current_date = start_date + timedelta(days=day_offset)
+            iso_date = current_date.isoformat()
+            month_short = month_map[current_date.month]
+            period_str = f"{month_short} {current_date.day:02d}"
+            sorted_chart.append({
+                "date": iso_date,
+                "period": period_str,
+                "total": chart_data.get(period_str, {}).get("total", 0),
+                "canceled": chart_data.get(period_str, {}).get("canceled", 0),
+            })
 
-        # Рост и падение
+        # Анализируем рост или падение по сравнению с предыдущим периодом
         previous_period_start = start_date - (today - start_date)
-        previous_patients_count = Patient.objects.filter(
-            appointment_date__range=(previous_period_start, start_date - timedelta(days=1))
-        ).count()
-        current_patients_count = patients.count()
+        previous_period_end = start_date - timedelta(days=1)
 
-        if previous_patients_count == 0:
-            growth_percent = 100 if current_patients_count > 0 else 0
+        previous_count = Patient.objects.filter(
+            appointment_date__range=(previous_period_start, previous_period_end)
+        ).count()
+
+        current_count = patients.count()
+
+        if previous_count == 0:
+            growth_percent = 100 if current_count > 0 else 0
             decline_percent = 0
-            trend = "up" if current_patients_count > 0 else "same"
+            trend = "up" if current_count > 0 else "down"
         else:
-            difference = current_patients_count - previous_patients_count
-            percent_change = round(abs(difference) / previous_patients_count * 100)
-            if difference > 0:
-                growth_percent = percent_change
-                decline_percent = 0
-                trend = "up"
-            elif difference < 0:
-                growth_percent = 0
-                decline_percent = percent_change
-                trend = "down"
-            else:
-                growth_percent = 0
-                decline_percent = 0
-                trend = "same"
+            diff = current_count - previous_count
+            percent = round(abs(diff) / previous_count * 100)
+            trend = "up" if diff > 0 else "down"
+            growth_percent = percent if trend == "up" else 0
+            decline_percent = percent if trend == "down" else 0
 
         total_doctors = Doctor.objects.count()
-        total_clients = current_patients_count
+        total_clients = intcomma(current_count)
 
         new_patients = patients.filter(status_patient='Живая очередь').count()
         repeated_patients = patients.exclude(status_patient='Живая очередь').count()
