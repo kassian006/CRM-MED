@@ -38,4 +38,4 @@ jobs:
           END
       - name: Run deploy
         run: |
-          ssh target "cd CRM_MED/mysite/ && sudo docker-compose down && sudo git fetch origin master && sudo git reset --hard origin/master && sudo docker-compose build && sudo docker-compose up -d --force-recreate"
+          ssh target "cd CRM-MED/mysite/ && sudo docker-compose down && sudo git fetch origin master && sudo git reset --hard origin/master && sudo docker-compose build && sudo docker-compose up -d --force-recreate"

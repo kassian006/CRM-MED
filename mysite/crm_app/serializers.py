@@ -7,6 +7,8 @@ from django.http import HttpResponse
 import openpyxl
 from django.db.models import Sum
 from .models import Report
+from django_rest_passwordreset.models import ResetPasswordToken
+
 
 class VerifyLoginCodeSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -595,3 +597,31 @@ class ReportDoctorsExportExcelView(APIView):
         response['Content-Disposition'] = 'attachment; filename=doctor_report.xlsx'
         workbook.save(response)
         return response
+
+
+
+class VerifyResetCodeSerializer(serializers.Serializer):
+    email = serializers.EmailField()  # Email пользователя
+    reset_code = serializers.IntegerField()  # 4-значный код
+    new_password = serializers.CharField(write_only=True)  # Новый пароль
+
+    def validate(self, data):
+        email = data.get('email')
+        reset_code = data.get('reset_code')
+
+        # Проверяем, существует ли указанный код для email
+        try:
+            token = ResetPasswordToken.objects.get(user__email=email, key=reset_code)
+        except ResetPasswordToken.DoesNotExist:
+            raise serializers.ValidationError("Неверный код сброса или email.")
+
+        data['user'] = token.user
+        return data
+
+    def save(self):
+        user = self.validated_data['user']
+        new_password = self.validated_data['new_password']
+
+        # Устанавливаем новый пароль
+        user.set_password(new_password)
+        user.save()
